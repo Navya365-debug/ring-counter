@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4-Bit Ring Counter Simulation (D Flip-Flops)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        h1 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .panel {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .controls {
+            width: 260px;
+            flex-shrink: 0;
+        }
+        .simulation {
+            flex: 1;
+            min-width: 300px;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 10px 16px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        .clock-btn {
+            background: #4CAF50;
+            color: #fff;
+        }
+        .reset-btn {
+            background: #f44336;
+            color: #fff;
+        }
+        .auto-btn {
+            background: #2196F3;
+            color: #fff;
+        }
+        .ff-container {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0 5px 0;
+            flex-wrap: wrap;
+        }
+        .ff {
+            flex: 1;
+            min-width: 80px;
+            padding: 18px 10px;
+            text-align: center;
+            border-radius: 10px;
+            border: 2px solid #2196F3;
+            background: #e3f2fd;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .ff strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .q-high {
+            background: #ffeb3b !important;
+            border-color: #ffc107 !important;
+        }
+        .q-low {
+            background: #f5f5f5 !important;
+            border-color: #9e9e9e !important;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 6px;
+            text-align: center;
+        }
+        th {
+            background: #2196F3;
+            color: #fff;
+        }
+        .waveform {
+            position: relative;
+            height: 110px;
+            border: 1px solid #ccc;
+            background: #fafafa;
+            overflow: hidden;
+        }
+        .wave-track-label {
+            position: absolute;
+            left: 5px;
+            font-size: 12px;
+        }
+        .wave-track-line {
+            position: absolute;
+            left: 30px;
+            right: 5px;
+            height: 2px;
+            background: #ddd;
+        }
+        .wave-high-block {
+            position: absolute;
+            top: 0;
+            height: 12px;
+            background: #4CAF50;
+        }
+        @media (max-width: 800px) {
+            .controls {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🌀 4-Bit Ring Counter Simulation (D Flip-Flops)</h1>
+    <p>Click <strong>Clock</strong> to advance states. The single '1' moves like: 1000 → 0100 → 0010 → 0001 → 1000.</p>
+
+    <div class="container">
+        <!-- Controls Panel -->
+        <div class="panel controls">
+            <h3>Controls</h3>
+            <button class="clock-btn" onclick="clockPulse()">⏰ Clock</button>
+            <button class="reset-btn" onclick="resetCounter()">🔄 Reset (1000)</button>
+            <button class="auto-btn" id="autoBtn" onclick="toggleAuto()">▶️ Auto-Run</button>
+            <p><strong>Clock:</strong> <span id="clockCount">0</span></p>
+        </div>
+
+        <!-- Simulation Panel -->
+        <div class="panel simulation">
+            <h3>Flip-Flop States (Q3 Q2 Q1 Q0)</h3>
+            <div class="ff-container">
+                <div class="ff" id="ff3">
+                    <strong>Q3</strong>
+                    <span id="q3">1</span>
+                </div>
+                <div class="ff" id="ff2">
+                    <strong>Q2</strong>
+                    <span id="q2">0</span>
+                </div>
+                <div class="ff" id="ff1">
+                    <strong>Q1</strong>
+                    <span id="q1">0</span>
+                </div>
+                <div class="ff" id="ff0">
+                    <strong>Q0</strong>
+                    <span id="q0">0</span>
+                </div>
+            </div>
+
+            <h3>State Table</h3>
+            <table id="stateTable">
+                <thead>
+                    <tr>
+                        <th>Clock</th>
+                        <th>Present (Q3Q2Q1Q0)</th>
+                        <th>D3</th>
+                        <th>D2</th>
+                        <th>D1</th>
+                        <th>D0</th>
+                        <th>Next</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <h3>Waveform</h3>
+            <div class="waveform" id="waveform"></div>
+        </div>
+    </div>
+
+    <script>
+        // State = [Q3, Q2, Q1, Q0]
+        let state = [1, 0, 0, 0];
+        let clockCount = 0;
+        let autoInterval = null;
+
+        const statesCycle = [
+            [1, 0, 0, 0], // 1000
+            [0, 1, 0, 0], // 0100
+            [0, 0, 1, 0], // 0010
+            [0, 0, 0, 1]  // 0001
+        ];
+
+        function updateDisplay() {
+            const qLabels = ['q3', 'q2', 'q1', 'q0'];
+
+            state.forEach((q, i) => {
+                const span = document.getElementById(qLabels[i]);
+                const ffBox = document.getElementById('ff' + (3 - i));
+                if (!span || !ffBox) return;
+                span.textContent = q;
+                ffBox.classList.remove('q-high', 'q-low');
+                ffBox.classList.add(q === 1 ? 'q-high' : 'q-low');
+            });
+
+            document.getElementById('clockCount').textContent = clockCount;
+            updateTable();
+            updateWaveform();
+        }
+
+        function clockPulse() {
+            const index = clockCount % statesCycle.length;
+            state = statesCycle[index].slice();
+            clockCount++;
+            updateDisplay();
+        }
+
+        function resetCounter() {
+            if (autoInterval) {
+                clearInterval(autoInterval);
+                autoInterval = null;
+                document.getElementById('autoBtn').textContent = '▶️ Auto-Run';
+            }
+            state = [1, 0, 0, 0];
+            clockCount = 0;
+            updateDisplay();
+        }
+
+        function toggleAuto() {
+            const btn = document.getElementById('autoBtn');
+            if (autoInterval) {
+                clearInterval(autoInterval);
+                autoInterval = null;
+                btn.textContent = '▶️ Auto-Run';
+            } else {
+                btn.textContent = '⏸️ Stop';
+                autoInterval = setInterval(clockPulse, 500);
+            }
+        }
+
+        function updateTable() {
+            const tbody = document.querySelector('#stateTable tbody');
+            tbody.innerHTML = '';
+
+            const currIndex = (clockCount - 1 + statesCycle.length) % statesCycle.length;
+            const present = statesCycle[currIndex];
+            const next = statesCycle[clockCount % statesCycle.length];
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${clockCount}</td>
+                <td>${present.join('')}</td>
+                <td>${next[0]}</td>
+                <td>${next[1]}</td>
+                <td>${next[2]}</td>
+                <td>${next[3]}</td>
+                <td>${next.join('')}</td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        function updateWaveform() {
+            const wf = document.getElementById('waveform');
+            wf.innerHTML = '';
+            const widthPerStep = 40;
+            const visibleSteps = Math.max(clockCount, 1);
+            const totalWidth = visibleSteps * widthPerStep;
+
+            for (let i = 0; i < 4; i++) {
+                const topBase = 10 + i * 25;
+
+                const label = document.createElement('div');
+                label.className = 'wave-track-label';
+                label.style.top = topBase + 'px';
+                label.textContent = 'Q' + (3 - i);
+                wf.appendChild(label);
+
+                const line = document.createElement('div');
+                line.className = 'wave-track-line';
+                line.style.top = (topBase + 6) + 'px';
+                wf.appendChild(line);
+
+                for (let c = 0; c < visibleSteps; c++) {
+                    const idx = (c - 1 + statesCycle.length) % statesCycle.length;
+                    const qVal = statesCycle[idx][i];
+                    if (qVal === 1) {
+                        const block = document.createElement('div');
+                        block.className = 'wave-high-block';
+                        block.style.top = (topBase + 1) + 'px';
+                        block.style.left = (30 + c * widthPerStep) + 'px';
+                        block.style.width = (widthPerStep - 4) + 'px';
+                        wf.appendChild(block);
+                    }
+                }
+            }
+
+            wf.style.width = Math.min(totalWidth + 50, wf.parentElement.clientWidth - 10) + 'px';
+        }
+
+        // Initialize when page loads
+        resetCounter();
+    </script>
+</body>
+</html>
